@@ -1,12 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { SafeAreaView, StyleSheet, View } from 'react-native';
+import HomeScreen from './src/screens/HomeScreen';
+import GameScreen from './src/screens/GameScreen';
+
+export type ScreenState = 'home' | 'game';
 
 export default function App() {
+  const [currentScreen, setCurrentScreen] = useState<ScreenState>('home');
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
+    <SafeAreaView style={styles.container}>
       <StatusBar style="auto" />
-    </View>
+      {currentScreen === 'home' ? (
+        <HomeScreen onPlay={() => setCurrentScreen('game')} />
+      ) : (
+        <GameScreen onHome={() => setCurrentScreen('home')} />
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -14,7 +25,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
