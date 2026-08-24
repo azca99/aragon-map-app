@@ -10,6 +10,6 @@ export interface Municipality {
   longitude: number;
   difficulty: Difficulty;
   population: number;
-  populationYear: number;
+  populationYear?: number;
   funFact?: string;
 }
