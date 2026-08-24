@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import MapComponent from '../components/MapComponent';
+import { Municipality } from '../models/Municipality';
+import { TEMPORARY_MUNICIPALITIES } from '../data/municipalities';
 
 interface Props {
   onHome: () => void;
@@ -8,15 +10,19 @@ interface Props {
 
 export default function GameScreen({ onHome }: Props) {
   const [pinPosition, setPinPosition] = useState<[number, number] | null>(null);
+  const [currentMunicipality, setCurrentMunicipality] = useState<Municipality | null>(null);
 
   // Coordenadas aproximadas del centro de Aragón
   const aragonCenter = [-0.9057, 41.5976]; 
 
-  const handleMapPress = (event: any) => {
-    const lngLat = event?.nativeEvent?.lngLat || event?.lngLat || event?.geometry?.coordinates;
-    if (lngLat && Array.isArray(lngLat)) {
-       setPinPosition([lngLat[0], lngLat[1]]);
-    }
+  useEffect(() => {
+    // Seleccionar un municipio aleatorio al montar la pantalla
+    const randomIndex = Math.floor(Math.random() * TEMPORARY_MUNICIPALITIES.length);
+    setCurrentMunicipality(TEMPORARY_MUNICIPALITIES[randomIndex]);
+  }, []);
+
+  const handleMapPress = (lngLat: [number, number]) => {
+    setPinPosition(lngLat);
   };
 
   return (
@@ -25,7 +31,9 @@ export default function GameScreen({ onHome }: Props) {
         <TouchableOpacity style={styles.backButton} onPress={onHome}>
           <Text style={styles.backButtonText}>{'<'}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerText}>¿Dónde está ZARAGOZA?</Text>
+        <Text style={styles.headerText}>
+          ¿Dónde está {currentMunicipality ? currentMunicipality.name.toUpperCase() : '...'}?
+        </Text>
       </View>
       
       <View style={styles.mapContainer}>
