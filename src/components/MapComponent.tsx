@@ -18,15 +18,18 @@ export default function MapComponent({ center, onPress, pinPosition, correctPosi
   useEffect(() => {
     if (correctPosition && pinPosition && cameraRef.current) {
       // Calcular bounds que incluyan ambos puntos
-      const west = Math.min(pinPosition[0], correctPosition[0]);
-      const east = Math.max(pinPosition[0], correctPosition[0]);
-      const south = Math.min(pinPosition[1], correctPosition[1]);
-      const north = Math.max(pinPosition[1], correctPosition[1]);
+      // Añadir un pequeño margen (aprox 10-15km) para asegurar que el área nunca sea cero
+      // (Si el usuario acierta exactamente, west==east y maplibre puede crashear el GL context)
+      const margin = 0.15; 
+      const west = Math.min(pinPosition[0], correctPosition[0]) - margin;
+      const east = Math.max(pinPosition[0], correctPosition[0]) + margin;
+      const south = Math.min(pinPosition[1], correctPosition[1]) - margin;
+      const north = Math.max(pinPosition[1], correctPosition[1]) + margin;
       
       // Animar la cámara para encuadrar ambos puntos
       cameraRef.current.fitBounds(
         [west, south, east, north],
-        { padding: { top: 100, right: 50, bottom: 250, left: 50 }, duration: 1000 }
+        { padding: { top: 50, right: 50, bottom: 50, left: 50 }, duration: 1000 }
       );
     }
   }, [correctPosition, pinPosition]);
