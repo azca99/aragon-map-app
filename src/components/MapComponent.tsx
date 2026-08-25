@@ -2,8 +2,20 @@ import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 
+import {
+  ARAGON_CENTER,
+  INITIAL_ZOOM,
+  INITIAL_PITCH,
+  INITIAL_BEARING,
+  MAP_MAX_BOUNDS,
+  MAP_MIN_ZOOM,
+  FIT_BOUNDS_MARGIN
+} from '../constants/map';
+
+// GeoJSON generado del contorno administrativo de Aragón
+import aragonBorder from '../data/aragon.json';
+
 interface Props {
-  center: number[];
   onPress: (lngLat: [number, number]) => void;
   pinPosition: [number, number] | null;
   correctPosition?: [number, number] | null;
@@ -12,25 +24,34 @@ interface Props {
 
 const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-nolabels-gl-style/style.json'; 
 
-export default function MapComponent({ center, onPress, pinPosition, correctPosition, locked }: Props) {
+export default function MapComponent({ onPress, pinPosition, correctPosition, locked }: Props) {
   const cameraRef = useRef<any>(null);
 
+  // Efecto para encuadrar resultados o resetear la cámara
   useEffect(() => {
-    if (correctPosition && pinPosition && cameraRef.current) {
-      // Calcular bounds que incluyan ambos puntos
-      // Añadir un pequeño margen (aprox 10-15km) para asegurar que el área nunca sea cero
-      // (Si el usuario acierta exactamente, west==east y maplibre puede crashear el GL context)
-      const margin = 0.15; 
-      const west = Math.min(pinPosition[0], correctPosition[0]) - margin;
-      const east = Math.max(pinPosition[0], correctPosition[0]) + margin;
-      const south = Math.min(pinPosition[1], correctPosition[1]) - margin;
-      const north = Math.max(pinPosition[1], correctPosition[1]) + margin;
+    if (!cameraRef.current) return;
+
+    if (correctPosition && pinPosition) {
+      // ESTADO DE RESULTADO: Hacer fitBounds a los dos puntos
+      const west = Math.min(pinPosition[0], correctPosition[0]) - FIT_BOUNDS_MARGIN;
+      const east = Math.max(pinPosition[0], correctPosition[0]) + FIT_BOUNDS_MARGIN;
+      const south = Math.min(pinPosition[1], correctPosition[1]) - FIT_BOUNDS_MARGIN;
+      const north = Math.max(pinPosition[1], correctPosition[1]) + FIT_BOUNDS_MARGIN;
       
-      // Animar la cámara para encuadrar ambos puntos
       cameraRef.current.fitBounds(
         [west, south, east, north],
-        { padding: { top: 50, right: 50, bottom: 50, left: 50 }, duration: 1000 }
+        // Más padding abajo (bottom: 280) para que la tarjeta de resultados no tape los puntos
+        { padding: { top: 50, right: 50, bottom: 280, left: 50 }, duration: 800 }
       );
+    } else if (pinPosition === null && correctPosition == null) {
+      // ESTADO INICIAL DE RONDA: resetear cámara explícitamente
+      cameraRef.current.flyTo({
+        center: ARAGON_CENTER,
+        zoom: INITIAL_ZOOM,
+        pitch: INITIAL_PITCH,
+        bearing: INITIAL_BEARING,
+        duration: 400
+      });
     }
   }, [correctPosition, pinPosition]);
 
@@ -61,17 +82,38 @@ export default function MapComponent({ center, onPress, pinPosition, correctPosi
         style={styles.map}
         mapStyle={MAP_STYLE}
         onPress={handleMapPress}
+        logo={true}
+        attribution={true}
+        logoPosition={{ bottom: 10, left: 10 }}
+        attributionPosition={{ bottom: 10, right: 10 }}
       >
         <Camera
           ref={cameraRef}
-          center={center as [number, number]}
-          zoom={7.0}
-          minZoom={6.5}
+          center={ARAGON_CENTER}
+          zoom={INITIAL_ZOOM}
+          pitch={INITIAL_PITCH}
+          bearing={INITIAL_BEARING}
+          minZoom={MAP_MIN_ZOOM}
           maxZoom={15.0}
-          maxBounds={[-3.5, 39.0, 1.5, 43.5]}
-          duration={0}
+          maxBounds={MAP_MAX_BOUNDS}
+          duration={0} // 0 para la carga inicial
         />
+
+        {/* 1. Límite Administrativo de Aragón (Fondo) */}
+        <GeoJSONSource id="aragon-border" data={aragonBorder as any}>
+          <Layer
+            id="aragon-border-layer"
+            type="line"
+            style={{
+              lineColor: '#6B7280', // Gris visible pero no intrusivo
+              lineWidth: 2,
+              lineOpacity: 0.8,
+              lineDasharray: [2, 1]
+            }}
+          />
+        </GeoJSONSource>
         
+        {/* 2. Línea de Resultado */}
         {lineFeature && (
           <GeoJSONSource id="result-line" data={lineFeature}>
             <Layer 
@@ -86,6 +128,7 @@ export default function MapComponent({ center, onPress, pinPosition, correctPosi
           </GeoJSONSource>
         )}
 
+        {/* 3. Marcadores de Posición Correcta y del Usuario */}
         {correctPosition && (
           <Marker
             id="correct-pin"

@@ -21,9 +21,6 @@ export default function GameScreen({ onHome }: Props) {
   const [roundDistance, setRoundDistance] = useState(0);
   const [isGameOver, setIsGameOver] = useState(false);
 
-  // Coordenadas aproximadas del centro de Aragón
-  const aragonCenter = [-0.9057, 41.5976];
-
   // Iniciar partida
   const initGame = () => {
     setGameMunicipalities(generateGameMunicipalities());
@@ -121,7 +118,6 @@ export default function GameScreen({ onHome }: Props) {
       
       <View style={styles.mapContainer}>
         <MapComponent 
-          center={aragonCenter} 
           onPress={handleMapPress}
           pinPosition={pinPosition}
           correctPosition={correctPosition}
