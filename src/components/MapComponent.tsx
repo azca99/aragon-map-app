@@ -13,6 +13,8 @@ import {
 } from '../constants/map';
 
 // GeoJSON generado del contorno administrativo de Aragón
+// Es un asset local para evitar peticiones de red y mejorar el rendimiento.
+// Fuente, licencia (ODbL) y detalles de extracción documentados en: docs/data-sources.md
 import aragonBorder from '../data/aragon.json';
 
 interface Props {
