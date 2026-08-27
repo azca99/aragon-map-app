@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import MapComponent from '../components/MapComponent';
 import { Municipality } from '../models/Municipality';
 import { generateGameMunicipalities } from '../utils/gameLogic';
@@ -8,6 +8,13 @@ import { calculateScore } from '../utils/scoring';
 
 interface Props {
   onHome: () => void;
+}
+
+export interface RoundResult {
+  municipality: Municipality;
+  distanceKm: number;
+  score: number;
+  roundNumber: number;
 }
 
 export default function GameScreen({ onHome }: Props) {
@@ -19,6 +26,7 @@ export default function GameScreen({ onHome }: Props) {
   const [totalScore, setTotalScore] = useState(0);
   const [roundScore, setRoundScore] = useState(0);
   const [roundDistance, setRoundDistance] = useState(0);
+  const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
 
   // Iniciar partida
@@ -26,6 +34,7 @@ export default function GameScreen({ onHome }: Props) {
     setGameMunicipalities(generateGameMunicipalities());
     setCurrentRoundIndex(0);
     setTotalScore(0);
+    setRoundHistory([]);
     resetRound();
     setIsGameOver(false);
   };
@@ -66,6 +75,13 @@ export default function GameScreen({ onHome }: Props) {
     setRoundDistance(dist);
     setRoundScore(pts);
     setTotalScore(prev => prev + pts);
+    setRoundHistory(prev => [...prev, {
+      municipality: currentMunicipality,
+      distanceKm: dist,
+      score: pts,
+      roundNumber: currentRoundIndex + 1
+    }]);
+    
     setConfirmed(true);
   };
 
@@ -78,19 +94,72 @@ export default function GameScreen({ onHome }: Props) {
     }
   };
 
+  const getAssessmentText = (score: number) => {
+    if (score >= 45000) return "Maestro de Aragón";
+    if (score >= 35000) return "Conoces Aragón muy bien";
+    if (score >= 25000) return "Buen conocimiento";
+    if (score >= 15000) return "Todavía queda Aragón por recorrer";
+    return "Hora de estudiar el mapa";
+  };
+
   if (isGameOver) {
+    const bestRound = [...roundHistory].sort((a, b) => b.score - a.score)[0];
+    const worstRound = [...roundHistory].sort((a, b) => a.score - b.score)[0];
+
     return (
       <View style={styles.gameOverContainer}>
-        <Text style={styles.gameOverTitle}>PARTIDA TERMINADA</Text>
-        <Text style={styles.gameOverScore}>{totalScore.toLocaleString('es-ES')} / 50.000 puntos</Text>
-        
-        <TouchableOpacity style={styles.primaryButton} onPress={initGame}>
-          <Text style={styles.primaryButtonText}>JUGAR OTRA VEZ</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={[styles.primaryButton, styles.secondaryButton]} onPress={onHome}>
-          <Text style={[styles.primaryButtonText, styles.secondaryButtonText]}>INICIO</Text>
-        </TouchableOpacity>
+        <ScrollView contentContainerStyle={styles.gameOverScroll} showsVerticalScrollIndicator={false}>
+          <Text style={styles.gameOverTitle}>PARTIDA TERMINADA</Text>
+          <Text style={styles.gameOverScore}>{totalScore.toLocaleString('es-ES')} / 50.000 pts</Text>
+          <Text style={styles.gameOverAssessment}>{getAssessmentText(totalScore)}</Text>
+          
+          {(bestRound && worstRound && roundHistory.length > 0) && (
+            <View style={styles.highlightsContainer}>
+              <View style={styles.highlightBox}>
+                <Text style={styles.highlightLabel}>Mejor ronda</Text>
+                <Text style={styles.highlightMuni}>{bestRound.municipality.name}</Text>
+                <Text style={styles.highlightPoints}>{bestRound.score.toLocaleString('es-ES')} pts</Text>
+              </View>
+              <View style={styles.highlightBox}>
+                <Text style={styles.highlightLabel}>Peor ronda</Text>
+                <Text style={styles.highlightMuni}>{worstRound.municipality.name}</Text>
+                <Text style={styles.highlightPoints}>{worstRound.score.toLocaleString('es-ES')} pts</Text>
+              </View>
+            </View>
+          )}
+
+          <Text style={styles.historyTitle}>Resumen de las 10 rondas</Text>
+          <View style={styles.historyList}>
+            {roundHistory.map((rh, index) => {
+               // Indicador visual discreto
+               let dotColor = '#EF4444'; // rojo (malo)
+               if (rh.score >= 4000) dotColor = '#10B981'; // verde (muy bueno)
+               else if (rh.score >= 2000) dotColor = '#F59E0B'; // amarillo (regular)
+
+               // No mostrar borde inferior en el último elemento
+               const borderStyle = index === roundHistory.length - 1 ? { borderBottomWidth: 0 } : {};
+
+               return (
+                 <View key={index} style={[styles.historyItem, borderStyle]}>
+                   <View style={[styles.historyDot, { backgroundColor: dotColor }]} />
+                   <View style={styles.historyInfo}>
+                     <Text style={styles.historyMuni}>{rh.roundNumber}. {rh.municipality.name}</Text>
+                     <Text style={styles.historyDist}>{rh.distanceKm.toFixed(1)} km</Text>
+                   </View>
+                   <Text style={[styles.historyPts, { color: dotColor }]}>{rh.score.toLocaleString('es-ES')} pts</Text>
+                 </View>
+               );
+            })}
+          </View>
+          
+          <TouchableOpacity style={styles.primaryButton} onPress={initGame}>
+            <Text style={styles.primaryButtonText}>JUGAR OTRA VEZ</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={[styles.primaryButton, styles.secondaryButton]} onPress={onHome}>
+            <Text style={[styles.primaryButtonText, styles.secondaryButtonText]}>INICIO</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
@@ -284,21 +353,119 @@ const styles = StyleSheet.create({
   },
   gameOverContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 20,
+    backgroundColor: '#F3F4F6',
+  },
+  gameOverScroll: {
+    padding: 24,
+    paddingTop: 60,
+    paddingBottom: 40,
   },
   gameOverTitle: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 8,
+    letterSpacing: 1,
   },
   gameOverScore: {
-    fontSize: 24,
-    color: '#4CAF50',
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#10B981',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  gameOverAssessment: {
+    fontSize: 18,
+    color: '#374151',
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 32,
+  },
+  highlightsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 32,
+    gap: 12, // Nota: gap requiere RN >= 0.71, usamos margin si falla, pero asumo que funciona.
+  },
+  highlightBox: {
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    marginHorizontal: 4,
+  },
+  highlightLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    textTransform: 'uppercase',
     fontWeight: 'bold',
-    marginBottom: 40,
-  }
+    marginBottom: 4,
+  },
+  highlightMuni: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  highlightPoints: {
+    fontSize: 14,
+    color: '#4B5563',
+    fontWeight: '600',
+  },
+  historyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  historyList: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  historyDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  historyInfo: {
+    flex: 1,
+  },
+  historyMuni: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  historyDist: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  historyPts: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
 });

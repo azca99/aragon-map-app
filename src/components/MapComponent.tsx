@@ -36,11 +36,17 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
 
     if (correctPosition && pinPosition) {
       // ESTADO DE RESULTADO: Hacer fitBounds a los dos puntos
-      const west = Math.min(pinPosition[0], correctPosition[0]) - FIT_BOUNDS_MARGIN;
-      const east = Math.max(pinPosition[0], correctPosition[0]) + FIT_BOUNDS_MARGIN;
-      const south = Math.min(pinPosition[1], correctPosition[1]) - FIT_BOUNDS_MARGIN;
-      const north = Math.max(pinPosition[1], correctPosition[1]) + FIT_BOUNDS_MARGIN;
+      let west = Math.min(pinPosition[0], correctPosition[0]) - FIT_BOUNDS_MARGIN;
+      let east = Math.max(pinPosition[0], correctPosition[0]) + FIT_BOUNDS_MARGIN;
+      let south = Math.min(pinPosition[1], correctPosition[1]) - FIT_BOUNDS_MARGIN;
+      let north = Math.max(pinPosition[1], correctPosition[1]) + FIT_BOUNDS_MARGIN;
       
+      // Clamp a los límites máximos permitidos
+      west = Math.max(west, MAP_MAX_BOUNDS[0]);
+      south = Math.max(south, MAP_MAX_BOUNDS[1]);
+      east = Math.min(east, MAP_MAX_BOUNDS[2]);
+      north = Math.min(north, MAP_MAX_BOUNDS[3]);
+
       cameraRef.current.fitBounds(
         [west, south, east, north],
         // Más padding abajo (bottom: 280) para que la tarjeta de resultados no tape los puntos
