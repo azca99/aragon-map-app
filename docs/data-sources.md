@@ -15,3 +15,11 @@ Este documento detalla el origen y las licencias de los conjuntos de datos exter
 *   **Herramientas utilizadas**: Script de extracción nativo con `fetch` en Node.js.
 *   **Modificaciones realizadas**: Ninguna alteración a la geometría. Solo se envolvió en `{ type: 'Feature', properties: { name: 'Aragón' }, geometry: [...] }`.
 *   **Nombre del archivo final usado por la app**: `src/data/aragon.json`
+
+## Máscara exterior de Aragón (Polígono Invertido)
+
+*   **Nombre del archivo final usado por la app**: `src/data/aragon_mask.json`
+*   **Origen**: Archivo derivado localmente a partir del límite OSM existente (`aragon.json`).
+*   **Proceso realizado**: Se generó un GeoJSON de tipo `FeatureCollection` mediante un script de desarrollo. Contiene un polígono mundial que utiliza el contorno exterior de Aragón (anillo 0) como hueco interior. Los enclaves de otras comunidades dentro de Aragón (anillos interiores originales 1 y 2) se convirtieron en polígonos sólidos para quedar atenuados junto con el resto del exterior.
+*   **Licencia**: Conserva la misma atribución y licencia ODbL aplicable al archivo original de OpenStreetMap.
+*   **Uso en la app**: Se utiliza para atenuar visualmente el exterior de Aragón sin realizar procesamiento geométrico pesado en tiempo de ejecución.

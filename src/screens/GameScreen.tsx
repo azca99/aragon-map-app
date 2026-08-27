@@ -126,21 +126,21 @@ export default function GameScreen({ onHome }: Props) {
       </View>
       
       {confirmed ? (
-        <View style={styles.resultCard}>
-          <Text style={styles.resultName}>{currentMunicipality?.name.toUpperCase()}</Text>
-          <Text style={styles.resultInfo}>{currentMunicipality?.comarca} · {currentMunicipality?.province}</Text>
-          <Text style={styles.resultPop}>Población: {currentMunicipality?.population.toLocaleString('es-ES')} habitantes</Text>
-          
-          <View style={styles.resultStats}>
-            <Text style={styles.resultDistance}>Te has quedado a {roundDistance.toFixed(1)} km</Text>
+          <View style={styles.resultCard}>
             <Text style={styles.resultPoints}>+{roundScore.toLocaleString('es-ES')} puntos</Text>
+            <Text style={styles.resultDistance}>A {roundDistance.toFixed(1)} km de distancia</Text>
+            
+            <View style={styles.resultDivider} />
+            
+            <Text style={styles.resultName}>{currentMunicipality?.name}</Text>
+            <Text style={styles.resultInfo}>{currentMunicipality?.comarca} • {currentMunicipality?.province}</Text>
+            <Text style={styles.resultPop}>{currentMunicipality?.population.toLocaleString('es-ES')} habitantes</Text>
+            
+            <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
+              <Text style={styles.primaryButtonText}>{currentRoundIndex < 9 ? 'SIGUIENTE' : 'FINALIZAR'}</Text>
+            </TouchableOpacity>
           </View>
-          
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
-            <Text style={styles.primaryButtonText}>{currentRoundIndex < 9 ? 'SIGUIENTE' : 'FINALIZAR'}</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
+        ) : (
         <View style={styles.footer}>
           <TouchableOpacity 
             style={[styles.primaryButton, !pinPosition && styles.primaryButtonDisabled]} 
@@ -213,50 +213,53 @@ const styles = StyleSheet.create({
     borderColor: '#eee',
   },
   resultCard: {
-    padding: 20,
+    padding: 24,
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderColor: '#eee',
-    elevation: 10,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    elevation: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+  },
+  resultPoints: {
+    fontSize: 32,
+    color: '#10B981', // Verde esmeralda (como el pin)
+    fontWeight: '900',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  resultDistance: {
+    fontSize: 16,
+    color: '#4B5563', // Gris oscuro
+    textAlign: 'center',
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  resultDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginBottom: 16,
   },
   resultName: {
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1F2937',
+    textAlign: 'center',
     marginBottom: 4,
   },
   resultInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
+    fontSize: 15,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   resultPop: {
-    fontSize: 13,
-    color: '#999',
-    marginBottom: 15,
-  },
-  resultStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  resultDistance: {
-    fontSize: 15,
-    color: '#333',
-    fontWeight: '500',
-  },
-  resultPoints: {
-    fontSize: 18,
-    color: '#4CAF50',
-    fontWeight: 'bold',
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   primaryButton: {
     backgroundColor: '#007AFF',

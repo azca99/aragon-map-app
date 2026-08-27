@@ -16,6 +16,7 @@ import {
 // Es un asset local para evitar peticiones de red y mejorar el rendimiento.
 // Fuente, licencia (ODbL) y detalles de extracción documentados en: docs/data-sources.md
 import aragonBorder from '../data/aragon.json';
+import aragonMask from '../data/aragon_mask.json';
 
 interface Props {
   onPress: (lngLat: [number, number]) => void;
@@ -101,28 +102,39 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
           duration={0} // 0 para la carga inicial
         />
 
-        {/* 1. Límite Administrativo de Aragón (Fondo) */}
+        {/* 1. Máscara Exterior (Atenúa todo menos Aragón) */}
+        <GeoJSONSource id="aragon-mask" data={aragonMask as any}>
+          <Layer
+            id="aragon-mask-layer"
+            type="fill"
+            style={{
+              fillColor: '#FFFFFF',
+              fillOpacity: 0.25, // 25% de opacidad para atenuar sin tapar
+            }}
+          />
+        </GeoJSONSource>
+
+        {/* 2. Límite Administrativo de Aragón (Borde continuo y claro) */}
         <GeoJSONSource id="aragon-border" data={aragonBorder as any}>
           <Layer
             id="aragon-border-layer"
             type="line"
             style={{
-              lineColor: '#6B7280', // Gris visible pero no intrusivo
-              lineWidth: 2,
-              lineOpacity: 0.8,
-              lineDasharray: [2, 1]
+              lineColor: '#2563EB', // Azul visible pero no agresivo
+              lineWidth: 2.5,
+              lineOpacity: 0.9,
             }}
           />
         </GeoJSONSource>
         
-        {/* 2. Línea de Resultado */}
+        {/* 3. Línea de Resultado */}
         {lineFeature && (
           <GeoJSONSource id="result-line" data={lineFeature}>
             <Layer 
               id="result-line-layer" 
               type="line"
               style={{
-                lineColor: '#333',
+                lineColor: '#1F2937', // Gris oscuro
                 lineWidth: 3,
                 lineDasharray: [2, 2]
               }} 
@@ -130,7 +142,7 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
           </GeoJSONSource>
         )}
 
-        {/* 3. Marcadores de Posición Correcta y del Usuario */}
+        {/* 4. Marcadores de Posición Correcta y del Usuario */}
         {correctPosition && (
           <Marker
             id="correct-pin"
@@ -138,7 +150,9 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
             anchor="bottom"
           >
              <View style={styles.correctPinContainer}>
-               <View style={styles.correctPinHead} />
+               <View style={styles.correctPinHead}>
+                  <View style={styles.correctPinInnerDot} />
+               </View>
                <View style={styles.correctPinPoint} />
              </View>
           </Marker>
@@ -184,8 +198,8 @@ const styles = StyleSheet.create({
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
     zIndex: 2,
   },
   pinPoint: {
@@ -200,27 +214,35 @@ const styles = StyleSheet.create({
   correctPinContainer: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    height: 40,
-    width: 20,
+    height: 42,
+    width: 24,
     zIndex: 10,
   },
   correctPinHead: {
-    width: 20,
-    height: 20,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    backgroundColor: '#10B981', // Verde esmeralda
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: 'white',
-    elevation: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
     zIndex: 2,
+  },
+  correctPinInnerDot: {
+    width: 6,
+    height: 6,
+    backgroundColor: 'white',
+    borderRadius: 3,
   },
   correctPinPoint: {
     width: 4,
-    height: 15,
+    height: 16,
     backgroundColor: '#333',
     marginTop: -4,
     borderBottomLeftRadius: 2,
