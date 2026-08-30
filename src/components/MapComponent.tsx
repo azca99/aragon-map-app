@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+﻿import React, { useRef, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 
@@ -12,11 +12,9 @@ import {
   FIT_BOUNDS_MARGIN
 } from '../constants/map';
 
-// GeoJSON generado del contorno administrativo de Aragón
-// Es un asset local para evitar peticiones de red y mejorar el rendimiento.
-// Fuente, licencia (ODbL) y detalles de extracción documentados en: docs/data-sources.md
 import aragonBorder from '../data/aragon.json';
 import aragonMask from '../data/aragon_mask.json';
+import { theme } from '../theme/theme';
 
 interface Props {
   onPress: (lngLat: [number, number]) => void;
@@ -29,19 +27,20 @@ const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-nolabels-gl-style/st
 
 export default function MapComponent({ onPress, pinPosition, correctPosition, locked }: Props) {
   const cameraRef = useRef<any>(null);
+  
+  // Guardamos el zoom actual para permitir o bloquear el scroll en el nivel mínimo
+  // y así evitar que el usuario arrastre el mapa y desajuste la vista inicial
+  const [currentZoom, setCurrentZoom] = useState(INITIAL_ZOOM);
 
-  // Efecto para encuadrar resultados o resetear la cámara
   useEffect(() => {
     if (!cameraRef.current) return;
 
     if (correctPosition && pinPosition) {
-      // ESTADO DE RESULTADO: Hacer fitBounds a los dos puntos
       let west = Math.min(pinPosition[0], correctPosition[0]) - FIT_BOUNDS_MARGIN;
       let east = Math.max(pinPosition[0], correctPosition[0]) + FIT_BOUNDS_MARGIN;
       let south = Math.min(pinPosition[1], correctPosition[1]) - FIT_BOUNDS_MARGIN;
       let north = Math.max(pinPosition[1], correctPosition[1]) + FIT_BOUNDS_MARGIN;
       
-      // Clamp a los límites máximos permitidos
       west = Math.max(west, MAP_MAX_BOUNDS[0]);
       south = Math.max(south, MAP_MAX_BOUNDS[1]);
       east = Math.min(east, MAP_MAX_BOUNDS[2]);
@@ -49,11 +48,9 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
 
       cameraRef.current.fitBounds(
         [west, south, east, north],
-        // Más padding abajo (bottom: 280) para que la tarjeta de resultados no tape los puntos
         { padding: { top: 50, right: 50, bottom: 280, left: 50 }, duration: 800 }
       );
     } else if (pinPosition === null && correctPosition == null) {
-      // ESTADO INICIAL DE RONDA: resetear cámara explícitamente
       cameraRef.current.flyTo({
         center: ARAGON_CENTER,
         zoom: INITIAL_ZOOM,
@@ -61,6 +58,7 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
         bearing: INITIAL_BEARING,
         duration: 400
       });
+      setCurrentZoom(INITIAL_ZOOM);
     }
   }, [correctPosition, pinPosition]);
 
@@ -71,8 +69,13 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
       onPress([lngLat[0], lngLat[1]]);
     }
   };
+  
+  const handleRegionDidChange = (event: any) => {
+    if (event?.properties?.zoom !== undefined) {
+      setCurrentZoom(event.properties.zoom);
+    }
+  };
 
-  // Línea GeoJSON para conectar los puntos
   const lineFeature = (pinPosition && correctPosition) ? {
     type: 'FeatureCollection' as const,
     features: [{
@@ -84,6 +87,10 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
       }
     }]
   } : null;
+  
+  // Si estamos muy cerca del zoom mínimo, bloqueamos el arrastre (scroll)
+  // para evitar que el usuario pueda sacar Aragn del centro
+  const isScrollEnabled = currentZoom > MAP_MIN_ZOOM + 0.15;
 
   return (
     <View style={styles.container}>
@@ -91,10 +98,10 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
         style={styles.map}
         mapStyle={MAP_STYLE}
         onPress={handleMapPress}
-        logo={true}
-        attribution={true}
-        logoPosition={{ bottom: 10, left: 10 }}
-        attributionPosition={{ bottom: 10, right: 10 }}
+        onRegionDidChange={handleRegionDidChange}
+        logo={false}
+        attribution={false}
+        dragPan={isScrollEnabled}
       >
         <Camera
           ref={cameraRef}
@@ -105,7 +112,7 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
           minZoom={MAP_MIN_ZOOM}
           maxZoom={15.0}
           maxBounds={MAP_MAX_BOUNDS}
-          duration={0} // 0 para la carga inicial
+          duration={0}
         />
 
         {/* 1. Máscara Exterior (Atenúa todo menos Aragón) */}
@@ -114,21 +121,21 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
             id="aragon-mask-layer"
             type="fill"
             style={{
-              fillColor: '#FFFFFF',
-              fillOpacity: 0.25, // 25% de opacidad para atenuar sin tapar
+              fillColor: theme.colors.surface,
+              fillOpacity: 0.15,
             }}
           />
         </GeoJSONSource>
 
-        {/* 2. Límite Administrativo de Aragón (Borde continuo y claro) */}
+        {/* 2. Límite Administrativo de Aragn */}
         <GeoJSONSource id="aragon-border" data={aragonBorder as any}>
           <Layer
             id="aragon-border-layer"
             type="line"
             style={{
-              lineColor: '#2563EB', // Azul visible pero no agresivo
-              lineWidth: 2.5,
-              lineOpacity: 0.9,
+              lineColor: theme.colors.mapBorder,
+              lineWidth: 2,
+              lineOpacity: 1,
             }}
           />
         </GeoJSONSource>
@@ -140,15 +147,15 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
               id="result-line-layer" 
               type="line"
               style={{
-                lineColor: '#1F2937', // Gris oscuro
-                lineWidth: 3,
+                lineColor: theme.colors.mapResultLine,
+                lineWidth: 2.5,
                 lineDasharray: [2, 2]
               }} 
             />
           </GeoJSONSource>
         )}
 
-        {/* 4. Marcadores de Posición Correcta y del Usuario */}
+        {/* 4. Marcadores */}
         {correctPosition && (
           <Marker
             id="correct-pin"
@@ -171,7 +178,9 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
             anchor="bottom"
           >
              <View style={styles.pinContainer}>
-               <View style={styles.pinHead} />
+               <View style={styles.pinHead}>
+                 <View style={styles.pinInnerDot} />
+               </View>
                <View style={styles.pinPoint} />
              </View>
           </Marker>
@@ -191,68 +200,73 @@ const styles = StyleSheet.create({
   pinContainer: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    height: 40,
-    width: 20,
+    height: 44,
+    width: 24,
+    zIndex: 10,
   },
   pinHead: {
-    width: 20,
-    height: 20,
-    backgroundColor: '#D81B60',
-    borderRadius: 10,
+    width: 24,
+    height: 24,
+    backgroundColor: theme.colors.primary,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: theme.colors.textMain,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4,
-    shadowRadius: 3,
-    zIndex: 2,
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  pinInnerDot: {
+    width: 6,
+    height: 6,
+    backgroundColor: '#FFF',
+    borderRadius: 3,
   },
   pinPoint: {
-    width: 4,
-    height: 15,
-    backgroundColor: '#333',
-    marginTop: -4,
+    width: 3,
+    height: 18,
+    backgroundColor: theme.colors.primaryDark,
+    marginTop: -2,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
-    zIndex: 1,
   },
   correctPinContainer: {
     alignItems: 'center',
     justifyContent: 'flex-end',
-    height: 42,
+    height: 44,
     width: 24,
-    zIndex: 10,
+    zIndex: 9,
   },
   correctPinHead: {
     width: 24,
     height: 24,
-    backgroundColor: '#10B981', // Verde esmeralda
+    backgroundColor: theme.colors.success,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#FFF',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
+    elevation: 4,
+    shadowColor: theme.colors.textMain,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    zIndex: 2,
   },
   correctPinInnerDot: {
     width: 6,
     height: 6,
-    backgroundColor: 'white',
+    backgroundColor: '#FFF',
     borderRadius: 3,
   },
   correctPinPoint: {
-    width: 4,
-    height: 16,
-    backgroundColor: '#333',
-    marginTop: -4,
+    width: 3,
+    height: 18,
+    backgroundColor: '#305A40',
+    marginTop: -2,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
-    zIndex: 1,
   }
 });

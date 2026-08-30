@@ -1,53 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
 import MapComponent from '../components/MapComponent';
-import { Municipality } from '../models/Municipality';
+import { theme } from '../theme/theme';
+import TopoPattern from '../components/TopoPattern';
 import { generateGameMunicipalities } from '../utils/gameLogic';
-import { calculateHaversineDistance } from '../utils/geography';
 import { calculateScore } from '../utils/scoring';
+import { calculateHaversineDistance } from '../utils/geography';
+import { Municipality } from '../models/Municipality';
+
+interface RoundResult {
+  municipality: Municipality;
+  distance: number;
+  points: number;
+}
 
 interface Props {
   onHome: () => void;
 }
 
-export interface RoundResult {
-  municipality: Municipality;
-  distanceKm: number;
-  score: number;
-  roundNumber: number;
-}
-
 export default function GameScreen({ onHome }: Props) {
-  // Game State
-  const [gameMunicipalities, setGameMunicipalities] = useState<Municipality[]>([]);
+  const [municipalities, setMunicipalities] = useState<Municipality[]>([]);
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [pinPosition, setPinPosition] = useState<[number, number] | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const [totalScore, setTotalScore] = useState(0);
-  const [roundScore, setRoundScore] = useState(0);
   const [roundDistance, setRoundDistance] = useState(0);
+  const [roundScore, setRoundScore] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
   const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
 
-  // Iniciar partida
-  const initGame = () => {
-    setGameMunicipalities(generateGameMunicipalities());
-    setCurrentRoundIndex(0);
-    setTotalScore(0);
-    setRoundHistory([]);
-    resetRound();
-    setIsGameOver(false);
-  };
+  // Animations
+  const resultCardAnim = useRef(new Animated.Value(0)).current;
+
+  // Lock para evitar doble confirmación
+  const confirmLock = useRef(false);
 
   useEffect(() => {
     initGame();
   }, []);
 
-  const resetRound = () => {
+  const initGame = () => {
+    setMunicipalities(generateGameMunicipalities());
+    setCurrentRoundIndex(0);
     setPinPosition(null);
     setConfirmed(false);
-    setRoundScore(0);
     setRoundDistance(0);
+    setRoundScore(0);
+    setTotalScore(0);
+    setRoundHistory([]);
+    setIsGameOver(false);
+    confirmLock.current = false;
+    resultCardAnim.setValue(0);
   };
 
   const handleMapPress = (lngLat: [number, number]) => {
@@ -56,109 +59,133 @@ export default function GameScreen({ onHome }: Props) {
     }
   };
 
-  const currentMunicipality = gameMunicipalities[currentRoundIndex];
-
   const handleConfirm = () => {
-    if (!pinPosition || !currentMunicipality) return;
-
-    // Calcular distancia (Haversine espera lat, lon)
-    // pinPosition es [lon, lat] y currentMunicipality tiene latitud, longitud
-    const dist = calculateHaversineDistance(
-      pinPosition[1],
-      pinPosition[0],
-      currentMunicipality.latitude,
-      currentMunicipality.longitude
-    );
+    if (!pinPosition || confirmed || isGameOver || confirmLock.current) return;
     
-    const pts = calculateScore(dist);
-
-    setRoundDistance(dist);
-    setRoundScore(pts);
-    setTotalScore(prev => prev + pts);
-    setRoundHistory(prev => [...prev, {
-      municipality: currentMunicipality,
-      distanceKm: dist,
-      score: pts,
-      roundNumber: currentRoundIndex + 1
-    }]);
+    // Bloquear síncronamente
+    confirmLock.current = true;
     
-    setConfirmed(true);
+    const currentMuni = municipalities[currentRoundIndex];
+    if (currentMuni) {
+      const distance = calculateHaversineDistance(
+        pinPosition[1],
+        pinPosition[0],
+        currentMuni.latitude,
+        currentMuni.longitude
+      );
+      const points = calculateScore(distance);
+      
+      setRoundDistance(distance);
+      setRoundScore(points);
+      setTotalScore((prev) => prev + points);
+      
+      setRoundHistory((prev) => [
+        ...prev,
+        { municipality: currentMuni, distance, points }
+      ]);
+      
+      setConfirmed(true);
+      
+      Animated.timing(resultCardAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
   };
 
   const handleNext = () => {
     if (currentRoundIndex < 9) {
-      setCurrentRoundIndex(prev => prev + 1);
-      resetRound();
+      setCurrentRoundIndex(currentRoundIndex + 1);
+      setPinPosition(null);
+      setConfirmed(false);
+      confirmLock.current = false;
+      resultCardAnim.setValue(0);
     } else {
       setIsGameOver(true);
     }
   };
 
+  const currentMunicipality = municipalities[currentRoundIndex];
+
   const getAssessmentText = (score: number) => {
-    if (score >= 45000) return "Maestro de Aragón";
-    if (score >= 35000) return "Conoces Aragón muy bien";
-    if (score >= 25000) return "Buen conocimiento";
-    if (score >= 15000) return "Todavía queda Aragón por recorrer";
-    return "Hora de estudiar el mapa";
+    if (score >= 45000) return "¡Maestro de Aragón!";
+    if (score >= 35000) return "Gran Conocedor";
+    if (score >= 25000) return "Explorador Aficionado";
+    if (score >= 15000) return "Turista Despistado";
+    return "Necesitas un mapa";
+  };
+
+  const getPointColor = (pts: number) => {
+    if (pts >= 4000) return theme.colors.success;
+    if (pts >= 2000) return theme.colors.accent;
+    return theme.colors.error;
   };
 
   if (isGameOver) {
-    const bestRound = [...roundHistory].sort((a, b) => b.score - a.score)[0];
-    const worstRound = [...roundHistory].sort((a, b) => a.score - b.score)[0];
+    let bestRound = roundHistory[0];
+    let worstRound = roundHistory[0];
+    
+    roundHistory.forEach(r => {
+      if (r.points > bestRound.points) bestRound = r;
+      if (r.points < worstRound.points) worstRound = r;
+    });
 
     return (
       <View style={styles.gameOverContainer}>
-        <ScrollView contentContainerStyle={styles.gameOverScroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.gameOverHeader}>
+          <TopoPattern color={theme.colors.secondary} opacity={0.06} />
           <Text style={styles.gameOverTitle}>PARTIDA TERMINADA</Text>
-          <Text style={styles.gameOverScore}>{totalScore.toLocaleString('es-ES')} / 50.000 pts</Text>
+          <Text style={styles.gameOverScore}>{totalScore.toLocaleString('es-ES')}</Text>
+          <Text style={styles.gameOverScoreMax}>/ 50.000 pts</Text>
           <Text style={styles.gameOverAssessment}>{getAssessmentText(totalScore)}</Text>
-          
-          {(bestRound && worstRound && roundHistory.length > 0) && (
-            <View style={styles.highlightsContainer}>
-              <View style={styles.highlightBox}>
-                <Text style={styles.highlightLabel}>Mejor ronda</Text>
-                <Text style={styles.highlightMuni}>{bestRound.municipality.name}</Text>
-                <Text style={styles.highlightPoints}>{bestRound.score.toLocaleString('es-ES')} pts</Text>
-              </View>
-              <View style={styles.highlightBox}>
-                <Text style={styles.highlightLabel}>Peor ronda</Text>
-                <Text style={styles.highlightMuni}>{worstRound.municipality.name}</Text>
-                <Text style={styles.highlightPoints}>{worstRound.score.toLocaleString('es-ES')} pts</Text>
-              </View>
+        </View>
+
+        <ScrollView style={styles.gameOverScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+          <View style={styles.highlightsContainer}>
+            <View style={styles.highlightBox}>
+              <Text style={styles.highlightLabel}>Mejor Ronda</Text>
+              <Text style={styles.highlightMuni}>{bestRound?.municipality.name}</Text>
+              <Text style={[styles.highlightPoints, { color: theme.colors.success }]}>
+                {bestRound?.points.toLocaleString('es-ES')} pts
+              </Text>
             </View>
-          )}
-
-          <Text style={styles.historyTitle}>Resumen de las 10 rondas</Text>
-          <View style={styles.historyList}>
-            {roundHistory.map((rh, index) => {
-               // Indicador visual discreto
-               let dotColor = '#EF4444'; // rojo (malo)
-               if (rh.score >= 4000) dotColor = '#10B981'; // verde (muy bueno)
-               else if (rh.score >= 2000) dotColor = '#F59E0B'; // amarillo (regular)
-
-               // No mostrar borde inferior en el último elemento
-               const borderStyle = index === roundHistory.length - 1 ? { borderBottomWidth: 0 } : {};
-
-               return (
-                 <View key={index} style={[styles.historyItem, borderStyle]}>
-                   <View style={[styles.historyDot, { backgroundColor: dotColor }]} />
-                   <View style={styles.historyInfo}>
-                     <Text style={styles.historyMuni}>{rh.roundNumber}. {rh.municipality.name}</Text>
-                     <Text style={styles.historyDist}>{rh.distanceKm.toFixed(1)} km</Text>
-                   </View>
-                   <Text style={[styles.historyPts, { color: dotColor }]}>{rh.score.toLocaleString('es-ES')} pts</Text>
-                 </View>
-               );
-            })}
+            <View style={styles.highlightBox}>
+              <Text style={styles.highlightLabel}>Peor Ronda</Text>
+              <Text style={styles.highlightMuni}>{worstRound?.municipality.name}</Text>
+              <Text style={[styles.highlightPoints, { color: theme.colors.error }]}>
+                {worstRound?.points.toLocaleString('es-ES')} pts
+              </Text>
+            </View>
           </View>
           
-          <TouchableOpacity style={styles.primaryButton} onPress={initGame}>
-            <Text style={styles.primaryButtonText}>JUGAR OTRA VEZ</Text>
-          </TouchableOpacity>
+          <View style={styles.historyList}>
+            {roundHistory.map((r, i) => (
+              <View key={i} style={[styles.historyItem, i === 9 && { borderBottomWidth: 0 }]}>
+                <View style={styles.historyLeft}>
+                  <View style={[styles.historyDot, { backgroundColor: getPointColor(r.points) }]} />
+                  <Text style={styles.historyNumber}>{i + 1}.</Text>
+                </View>
+                <View style={styles.historyInfo}>
+                  <Text style={styles.historyMuni}>{r.municipality.name}</Text>
+                  <Text style={styles.historyDist}>{r.distance.toFixed(1)} km</Text>
+                </View>
+                <Text style={[styles.historyPts, { color: getPointColor(r.points) }]}>
+                  {r.points.toLocaleString('es-ES')}
+                </Text>
+              </View>
+            ))}
+          </View>
           
-          <TouchableOpacity style={[styles.primaryButton, styles.secondaryButton]} onPress={onHome}>
-            <Text style={[styles.primaryButtonText, styles.secondaryButtonText]}>INICIO</Text>
-          </TouchableOpacity>
+          <View style={styles.endActions}>
+            <TouchableOpacity style={styles.primaryButton} onPress={initGame} activeOpacity={0.8}>
+              <Text style={styles.primaryButtonText}>JUGAR OTRA VEZ</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.secondaryButton} onPress={onHome} activeOpacity={0.8}>
+              <Text style={styles.secondaryButtonText}>INICIO</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </View>
     );
@@ -171,17 +198,21 @@ export default function GameScreen({ onHome }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={onHome}>
-          <Text style={styles.backButtonText}>{'<'}</Text>
-        </TouchableOpacity>
-        <View style={styles.headerTitles}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity style={styles.backButton} onPress={onHome}>
+            <Text style={styles.backButtonText}>{'<'}</Text>
+          </TouchableOpacity>
           <Text style={styles.roundText}>Ronda {currentRoundIndex + 1} / 10</Text>
-          <Text style={styles.headerText}>
-            ¿Dónde está {currentMunicipality ? currentMunicipality.name.toUpperCase() : '...'}?
-          </Text>
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreText}>{totalScore.toLocaleString('es-ES')} pts</Text>
+          </View>
         </View>
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>{totalScore.toLocaleString('es-ES')} pts</Text>
+        
+        <View style={styles.questionContainer}>
+          <Text style={styles.questionLabel}>¿Dónde está</Text>
+          <Text style={styles.questionMuni}>
+            {currentMunicipality ? currentMunicipality.name : '...'}?
+          </Text>
         </View>
       </View>
       
@@ -195,26 +226,41 @@ export default function GameScreen({ onHome }: Props) {
       </View>
       
       {confirmed ? (
-          <View style={styles.resultCard}>
-            <Text style={styles.resultPoints}>+{roundScore.toLocaleString('es-ES')} puntos</Text>
-            <Text style={styles.resultDistance}>A {roundDistance.toFixed(1)} km de distancia</Text>
-            
-            <View style={styles.resultDivider} />
-            
-            <Text style={styles.resultName}>{currentMunicipality?.name}</Text>
-            <Text style={styles.resultInfo}>{currentMunicipality?.comarca} • {currentMunicipality?.province}</Text>
-            <Text style={styles.resultPop}>{currentMunicipality?.population.toLocaleString('es-ES')} habitantes</Text>
-            
-            <TouchableOpacity style={styles.primaryButton} onPress={handleNext}>
-              <Text style={styles.primaryButtonText}>{currentRoundIndex < 9 ? 'SIGUIENTE' : 'FINALIZAR'}</Text>
-            </TouchableOpacity>
+        <Animated.View style={[
+          styles.resultCard, 
+          { 
+            transform: [{ 
+              translateY: resultCardAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [200, 0]
+              }) 
+            }] 
+          }
+        ]}>
+          <View style={styles.resultHeader}>
+            <Text style={[styles.resultPoints, { color: getPointColor(roundScore) }]}>
+              +{roundScore.toLocaleString('es-ES')} pts
+            </Text>
+            <Text style={styles.resultDistance}>{roundDistance.toFixed(1)} km</Text>
           </View>
-        ) : (
+          
+          <View style={styles.resultDivider} />
+          
+          <Text style={styles.resultName}>{currentMunicipality?.name}</Text>
+          <Text style={styles.resultInfo}>{currentMunicipality?.comarca} · {currentMunicipality?.province}</Text>
+          <Text style={styles.resultPop}>{currentMunicipality?.population.toLocaleString('es-ES')} hab.</Text>
+          
+          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} activeOpacity={0.8}>
+            <Text style={styles.primaryButtonText}>{currentRoundIndex < 9 ? 'SIGUIENTE' : 'FINALIZAR'}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      ) : (
         <View style={styles.footer}>
           <TouchableOpacity 
             style={[styles.primaryButton, !pinPosition && styles.primaryButtonDisabled]} 
             disabled={!pinPosition}
             onPress={handleConfirm}
+            activeOpacity={0.8}
           >
             <Text style={styles.primaryButtonText}>CONFIRMAR UBICACIÓN</Text>
           </TouchableOpacity>
@@ -227,245 +273,251 @@ export default function GameScreen({ onHome }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.background,
   },
   header: {
-    paddingTop: 40,
-    paddingBottom: 15,
-    paddingHorizontal: 15,
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.surface,
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.m,
+    paddingHorizontal: theme.spacing.m,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+    zIndex: 10,
+    ...theme.shadows.card,
+  },
+  headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: theme.spacing.m,
   },
   backButton: {
-    padding: 5,
-    width: 30,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
   },
   backButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  headerTitles: {
-    flex: 1,
-    alignItems: 'center',
+    ...theme.typography.h2,
+    color: theme.colors.textSecondary,
   },
   roundText: {
-    color: '#aaa',
-    fontSize: 12,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  headerText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    ...theme.typography.subtitle,
   },
   scoreContainer: {
-    width: 60,
+    minWidth: 40,
     alignItems: 'flex-end',
   },
   scoreText: {
-    color: '#4CAF50',
-    fontSize: 12,
-    fontWeight: 'bold',
+    ...theme.typography.subtitle,
+    color: theme.colors.primary,
+  },
+  questionContainer: {
+    alignItems: 'center',
+  },
+  questionLabel: {
+    ...theme.typography.body,
+    color: theme.colors.textSecondary,
+  },
+  questionMuni: {
+    ...theme.typography.h1,
+    color: theme.colors.textMain,
+    marginTop: theme.spacing.xs,
   },
   mapContainer: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   footer: {
-    padding: 20,
-    backgroundColor: '#fff',
+    padding: theme.spacing.m,
+    backgroundColor: theme.colors.surface,
     borderTopWidth: 1,
-    borderColor: '#eee',
+    borderColor: theme.colors.border,
   },
   resultCard: {
-    padding: 24,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    elevation: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.l,
+    borderTopLeftRadius: theme.radius.l,
+    borderTopRightRadius: theme.radius.l,
+    ...theme.shadows.card,
+  },
+  resultHeader: {
+    alignItems: 'center',
+    marginBottom: theme.spacing.m,
   },
   resultPoints: {
-    fontSize: 32,
-    color: '#10B981', // Verde esmeralda (como el pin)
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: 4,
+    ...theme.typography.dataLarge,
+    marginBottom: theme.spacing.xs,
   },
   resultDistance: {
-    fontSize: 16,
-    color: '#4B5563', // Gris oscuro
-    textAlign: 'center',
-    fontWeight: '600',
-    marginBottom: 16,
+    ...theme.typography.subtitle,
   },
   resultDivider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
-    marginBottom: 16,
+    backgroundColor: theme.colors.border,
+    marginBottom: theme.spacing.m,
   },
   resultName: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    ...theme.typography.h1,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing.xs,
   },
   resultInfo: {
-    fontSize: 15,
-    color: '#6B7280',
+    ...theme.typography.body,
     textAlign: 'center',
-    marginBottom: 4,
+    marginBottom: theme.spacing.xs,
   },
   resultPop: {
-    fontSize: 14,
-    color: '#9CA3AF',
+    ...theme.typography.caption,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: theme.spacing.l,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    borderRadius: 8,
+    backgroundColor: theme.colors.primary,
+    paddingVertical: theme.spacing.m,
+    borderRadius: theme.radius.m,
     alignItems: 'center',
+    ...theme.shadows.button,
   },
   primaryButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: theme.colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...theme.typography.button,
+    letterSpacing: 1,
   },
   secondaryButton: {
-    backgroundColor: '#f0f0f0',
-    marginTop: 15,
+    backgroundColor: 'transparent',
+    paddingVertical: theme.spacing.m,
+    borderRadius: theme.radius.m,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginTop: theme.spacing.m,
   },
   secondaryButtonText: {
-    color: '#333',
+    ...theme.typography.button,
+    color: theme.colors.textSecondary,
+    letterSpacing: 1,
   },
   gameOverContainer: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.background,
   },
-  gameOverScroll: {
-    padding: 24,
-    paddingTop: 60,
+  gameOverHeader: {
+    paddingTop: 80,
     paddingBottom: 40,
+    alignItems: 'center',
+    backgroundColor: theme.colors.surface,
+    borderBottomWidth: 1,
+    borderColor: theme.colors.border,
+    overflow: 'hidden',
   },
   gameOverTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6B7280',
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: 1,
+    ...theme.typography.subtitle,
+    letterSpacing: 2,
+    marginBottom: theme.spacing.m,
   },
   gameOverScore: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#10B981',
-    textAlign: 'center',
-    marginBottom: 4,
+    ...theme.typography.display,
+    fontSize: 48,
+    color: theme.colors.primary,
+  },
+  gameOverScoreMax: {
+    ...theme.typography.subtitle,
+    marginBottom: theme.spacing.m,
   },
   gameOverAssessment: {
-    fontSize: 18,
-    color: '#374151',
-    textAlign: 'center',
-    fontWeight: '600',
-    marginBottom: 32,
+    ...theme.typography.h2,
+    color: theme.colors.textMain,
+  },
+  gameOverScroll: {
+    padding: theme.spacing.m,
   },
   highlightsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    gap: 12, // Nota: gap requiere RN >= 0.71, usamos margin si falla, pero asumo que funciona.
+    marginBottom: theme.spacing.l,
+    gap: theme.spacing.m,
   },
   highlightBox: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: theme.colors.surface,
+    padding: theme.spacing.m,
+    borderRadius: theme.radius.m,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.card,
   },
   highlightLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+    ...theme.typography.caption,
     textTransform: 'uppercase',
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontWeight: '700',
+    marginBottom: theme.spacing.s,
   },
   highlightMuni: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 4,
+    ...theme.typography.body,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: theme.spacing.xs,
   },
   highlightPoints: {
-    fontSize: 14,
-    color: '#4B5563',
-    fontWeight: '600',
-  },
-  historyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1F2937',
-    marginBottom: 16,
+    ...theme.typography.body,
+    fontWeight: '700',
   },
   historyList: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radius.m,
+    paddingHorizontal: theme.spacing.m,
+    marginBottom: theme.spacing.xl,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
   },
   historyItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: theme.spacing.m,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: theme.colors.border,
+  },
+  historyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 40,
   },
   historyDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: theme.spacing.s,
+  },
+  historyNumber: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
   },
   historyInfo: {
     flex: 1,
   },
   historyMuni: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1F2937',
+    ...theme.typography.body,
+    fontWeight: '700',
     marginBottom: 2,
   },
   historyDist: {
-    fontSize: 14,
-    color: '#6B7280',
+    ...theme.typography.caption,
   },
   historyPts: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    ...theme.typography.body,
+    fontWeight: '700',
+    textAlign: 'right',
   },
+  endActions: {
+    marginBottom: theme.spacing.xl,
+  }
 });

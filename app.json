@@ -23,7 +23,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "@maplibre/maplibre-react-native"
-    ]
+      "@maplibre/maplibre-react-native",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "02697da7-870b-48d8-8ab9-cf665341dc01"
+      }
+    }
   }
 }
