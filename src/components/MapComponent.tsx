@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState } from 'react';
+﻿import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Map, Camera, Marker, GeoJSONSource, Layer } from '@maplibre/maplibre-react-native';
 
@@ -27,10 +27,6 @@ const MAP_STYLE = 'https://basemaps.cartocdn.com/gl/voyager-nolabels-gl-style/st
 
 export default function MapComponent({ onPress, pinPosition, correctPosition, locked }: Props) {
   const cameraRef = useRef<any>(null);
-  
-  // Guardamos el zoom actual para permitir o bloquear el scroll en el nivel mínimo
-  // y así evitar que el usuario arrastre el mapa y desajuste la vista inicial
-  const [currentZoom, setCurrentZoom] = useState(INITIAL_ZOOM);
 
   useEffect(() => {
     if (!cameraRef.current) return;
@@ -58,7 +54,6 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
         bearing: INITIAL_BEARING,
         duration: 400
       });
-      setCurrentZoom(INITIAL_ZOOM);
     }
   }, [correctPosition, pinPosition]);
 
@@ -67,12 +62,6 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
     const lngLat = event?.nativeEvent?.lngLat || event?.lngLat || event?.geometry?.coordinates;
     if (lngLat && Array.isArray(lngLat) && lngLat.length >= 2) {
       onPress([lngLat[0], lngLat[1]]);
-    }
-  };
-  
-  const handleRegionDidChange = (event: any) => {
-    if (event?.properties?.zoom !== undefined) {
-      setCurrentZoom(event.properties.zoom);
     }
   };
 
@@ -87,10 +76,6 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
       }
     }]
   } : null;
-  
-  // Si estamos muy cerca del zoom mínimo, bloqueamos el arrastre (scroll)
-  // para evitar que el usuario pueda sacar Aragn del centro
-  const isScrollEnabled = currentZoom > MAP_MIN_ZOOM + 0.15;
 
   return (
     <View style={styles.container}>
@@ -98,21 +83,20 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
         style={styles.map}
         mapStyle={MAP_STYLE}
         onPress={handleMapPress}
-        onRegionDidChange={handleRegionDidChange}
         logo={false}
         attribution={false}
-        dragPan={isScrollEnabled}
       >
         <Camera
           ref={cameraRef}
-          center={ARAGON_CENTER}
-          zoom={INITIAL_ZOOM}
-          pitch={INITIAL_PITCH}
-          bearing={INITIAL_BEARING}
+          initialViewState={{
+            center: ARAGON_CENTER,
+            zoom: INITIAL_ZOOM,
+            pitch: INITIAL_PITCH,
+            bearing: INITIAL_BEARING,
+          }}
           minZoom={MAP_MIN_ZOOM}
           maxZoom={15.0}
           maxBounds={MAP_MAX_BOUNDS}
-          duration={0}
         />
 
         {/* 1. Máscara Exterior (Atenúa todo menos Aragón) */}
@@ -127,7 +111,7 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
           />
         </GeoJSONSource>
 
-        {/* 2. Límite Administrativo de Aragn */}
+        {/* 2. Límite Administrativo de Aragón */}
         <GeoJSONSource id="aragon-border" data={aragonBorder as any}>
           <Layer
             id="aragon-border-layer"
