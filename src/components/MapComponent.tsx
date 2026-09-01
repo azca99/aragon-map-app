@@ -84,7 +84,8 @@ export default function MapComponent({ onPress, pinPosition, correctPosition, lo
         mapStyle={MAP_STYLE}
         onPress={handleMapPress}
         logo={false}
-        attribution={false}
+        attribution={true}
+        attributionPosition={{ top: 12, right: 12 }}
       >
         <Camera
           ref={cameraRef}
