@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, SafeAreaView } from 'react-native';
 import MapComponent from '../components/MapComponent';
 import { theme } from '../theme/theme';
 import TopoPattern from '../components/TopoPattern';
@@ -29,10 +29,7 @@ export default function GameScreen({ onHome }: Props) {
   const [roundHistory, setRoundHistory] = useState<RoundResult[]>([]);
   const [isGameOver, setIsGameOver] = useState(false);
 
-  // Animations
   const resultCardAnim = useRef(new Animated.Value(0)).current;
-
-  // Lock para evitar doble confirmación
   const confirmLock = useRef(false);
 
   useEffect(() => {
@@ -62,7 +59,6 @@ export default function GameScreen({ onHome }: Props) {
   const handleConfirm = () => {
     if (!pinPosition || confirmed || isGameOver || confirmLock.current) return;
     
-    // Bloquear síncronamente
     confirmLock.current = true;
     
     const currentMuni = municipalities[currentRoundIndex];
@@ -88,7 +84,7 @@ export default function GameScreen({ onHome }: Props) {
       
       Animated.timing(resultCardAnim, {
         toValue: 1,
-        duration: 250,
+        duration: 300,
         useNativeDriver: true,
       }).start();
     }
@@ -109,16 +105,16 @@ export default function GameScreen({ onHome }: Props) {
   const currentMunicipality = municipalities[currentRoundIndex];
 
   const getAssessmentText = (score: number) => {
-    if (score >= 45000) return "¡Maestro de Aragón!";
-    if (score >= 35000) return "Gran Conocedor";
+    if (score >= 45000) return "Conoces Aragón perfectamente";
+    if (score >= 35000) return "Gran Conocedor del territorio";
     if (score >= 25000) return "Explorador Aficionado";
     if (score >= 15000) return "Turista Despistado";
-    return "Necesitas un mapa";
+    return "Necesitas un mapa urgentemente";
   };
 
   const getPointColor = (pts: number) => {
     if (pts >= 4000) return theme.colors.success;
-    if (pts >= 2000) return theme.colors.accent;
+    if (pts >= 2000) return theme.colors.warning;
     return theme.colors.error;
   };
 
@@ -135,13 +131,13 @@ export default function GameScreen({ onHome }: Props) {
       <View style={styles.gameOverContainer}>
         <View style={styles.gameOverHeader}>
           <TopoPattern color={theme.colors.secondary} opacity={0.06} />
-          <Text style={styles.gameOverTitle}>PARTIDA TERMINADA</Text>
+          <Text style={styles.gameOverTitle}>PARTIDA COMPLETADA</Text>
           <Text style={styles.gameOverScore}>{totalScore.toLocaleString('es-ES')}</Text>
           <Text style={styles.gameOverScoreMax}>/ 50.000 pts</Text>
           <Text style={styles.gameOverAssessment}>{getAssessmentText(totalScore)}</Text>
         </View>
 
-        <ScrollView style={styles.gameOverScroll} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView style={styles.gameOverScroll} contentContainerStyle={{ paddingBottom: theme.spacing.xxl }}>
           <View style={styles.highlightsContainer}>
             <View style={styles.highlightBox}>
               <Text style={styles.highlightLabel}>Mejor Ronda</Text>
@@ -163,26 +159,28 @@ export default function GameScreen({ onHome }: Props) {
             {roundHistory.map((r, i) => (
               <View key={i} style={[styles.historyItem, i === 9 && { borderBottomWidth: 0 }]}>
                 <View style={styles.historyLeft}>
-                  <View style={[styles.historyDot, { backgroundColor: getPointColor(r.points) }]} />
                   <Text style={styles.historyNumber}>{i + 1}.</Text>
                 </View>
                 <View style={styles.historyInfo}>
                   <Text style={styles.historyMuni}>{r.municipality.name}</Text>
                   <Text style={styles.historyDist}>{r.distance.toFixed(1)} km</Text>
                 </View>
-                <Text style={[styles.historyPts, { color: getPointColor(r.points) }]}>
-                  {r.points.toLocaleString('es-ES')}
-                </Text>
+                <View style={styles.historyRight}>
+                  <View style={[styles.historyDot, { backgroundColor: getPointColor(r.points) }]} />
+                  <Text style={[styles.historyPts, { color: getPointColor(r.points) }]}>
+                    {r.points.toLocaleString('es-ES')}
+                  </Text>
+                </View>
               </View>
             ))}
           </View>
           
           <View style={styles.endActions}>
-            <TouchableOpacity style={styles.primaryButton} onPress={initGame} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.primaryButton} onPress={initGame} activeOpacity={0.85}>
               <Text style={styles.primaryButtonText}>JUGAR OTRA VEZ</Text>
             </TouchableOpacity>
             
-            <TouchableOpacity style={styles.secondaryButton} onPress={onHome} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={onHome} activeOpacity={0.85}>
               <Text style={styles.secondaryButtonText}>INICIO</Text>
             </TouchableOpacity>
           </View>
@@ -196,13 +194,13 @@ export default function GameScreen({ onHome }: Props) {
     : null;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.backButton} onPress={onHome}>
             <Text style={styles.backButtonText}>{'<'}</Text>
           </TouchableOpacity>
-          <Text style={styles.roundText}>Ronda {currentRoundIndex + 1} / 10</Text>
+          <Text style={styles.roundText}>Ronda {currentRoundIndex + 1} de 10</Text>
           <View style={styles.scoreContainer}>
             <Text style={styles.scoreText}>{totalScore.toLocaleString('es-ES')} pts</Text>
           </View>
@@ -232,14 +230,14 @@ export default function GameScreen({ onHome }: Props) {
             transform: [{ 
               translateY: resultCardAnim.interpolate({
                 inputRange: [0, 1],
-                outputRange: [200, 0]
+                outputRange: [300, 0]
               }) 
             }] 
           }
         ]}>
           <View style={styles.resultHeader}>
             <Text style={[styles.resultPoints, { color: getPointColor(roundScore) }]}>
-              +{roundScore.toLocaleString('es-ES')} pts
+              {roundScore.toLocaleString('es-ES')} pts
             </Text>
             <Text style={styles.resultDistance}>{roundDistance.toFixed(1)} km</Text>
           </View>
@@ -250,7 +248,7 @@ export default function GameScreen({ onHome }: Props) {
           <Text style={styles.resultInfo}>{currentMunicipality?.comarca} · {currentMunicipality?.province}</Text>
           <Text style={styles.resultPop}>{currentMunicipality?.population.toLocaleString('es-ES')} hab.</Text>
           
-          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.primaryButton} onPress={handleNext} activeOpacity={0.85}>
             <Text style={styles.primaryButtonText}>{currentRoundIndex < 9 ? 'SIGUIENTE' : 'FINALIZAR'}</Text>
           </TouchableOpacity>
         </Animated.View>
@@ -260,24 +258,24 @@ export default function GameScreen({ onHome }: Props) {
             style={[styles.primaryButton, !pinPosition && styles.primaryButtonDisabled]} 
             disabled={!pinPosition}
             onPress={handleConfirm}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             <Text style={styles.primaryButtonText}>CONFIRMAR UBICACIÓN</Text>
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.surface,
   },
   header: {
     backgroundColor: theme.colors.surface,
-    paddingTop: theme.spacing.xl,
+    paddingTop: theme.spacing.m,
     paddingBottom: theme.spacing.m,
     paddingHorizontal: theme.spacing.m,
     borderBottomWidth: 1,
@@ -289,7 +287,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: theme.spacing.m,
+    marginBottom: theme.spacing.sm,
   },
   backButton: {
     width: 40,
@@ -302,6 +300,8 @@ const styles = StyleSheet.create({
   },
   roundText: {
     ...theme.typography.subtitle,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
   scoreContainer: {
     minWidth: 40,
@@ -317,11 +317,12 @@ const styles = StyleSheet.create({
   questionLabel: {
     ...theme.typography.body,
     color: theme.colors.textSecondary,
+    marginBottom: theme.spacing.xs,
   },
   questionMuni: {
     ...theme.typography.h1,
     color: theme.colors.textMain,
-    marginTop: theme.spacing.xs,
+    textAlign: 'center',
   },
   mapContainer: {
     flex: 1,
@@ -340,6 +341,7 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: theme.colors.surface,
     padding: theme.spacing.l,
+    paddingBottom: theme.spacing.xl, // Safe area compensation
     borderTopLeftRadius: theme.radius.l,
     borderTopRightRadius: theme.radius.l,
     ...theme.shadows.card,
@@ -389,7 +391,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...theme.typography.button,
-    letterSpacing: 1,
   },
   secondaryButton: {
     backgroundColor: 'transparent',
@@ -398,20 +399,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginTop: theme.spacing.m,
+    marginTop: theme.spacing.sm,
   },
   secondaryButtonText: {
     ...theme.typography.button,
     color: theme.colors.textSecondary,
-    letterSpacing: 1,
   },
   gameOverContainer: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },
   gameOverHeader: {
-    paddingTop: 80,
-    paddingBottom: 40,
+    paddingTop: theme.spacing.xxl * 1.5,
+    paddingBottom: theme.spacing.xl,
     alignItems: 'center',
     backgroundColor: theme.colors.surface,
     borderBottomWidth: 1,
@@ -421,6 +421,7 @@ const styles = StyleSheet.create({
   gameOverTitle: {
     ...theme.typography.subtitle,
     letterSpacing: 2,
+    textTransform: 'uppercase',
     marginBottom: theme.spacing.m,
   },
   gameOverScore: {
@@ -463,13 +464,13 @@ const styles = StyleSheet.create({
   },
   highlightMuni: {
     ...theme.typography.body,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
     textAlign: 'center',
     marginBottom: theme.spacing.xs,
   },
   highlightPoints: {
     ...theme.typography.body,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
   },
   historyList: {
     backgroundColor: theme.colors.surface,
@@ -487,35 +488,39 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.colors.border,
   },
   historyLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 40,
-  },
-  historyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: theme.spacing.s,
+    width: 24,
   },
   historyNumber: {
     ...theme.typography.caption,
     color: theme.colors.textSecondary,
+    fontFamily: 'Manrope_700Bold',
   },
   historyInfo: {
     flex: 1,
   },
   historyMuni: {
     ...theme.typography.body,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
     marginBottom: 2,
   },
   historyDist: {
     ...theme.typography.caption,
   },
+  historyRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: theme.spacing.s,
+  },
   historyPts: {
     ...theme.typography.body,
-    fontWeight: '700',
+    fontFamily: 'Manrope_700Bold',
     textAlign: 'right',
+    width: 50,
   },
   endActions: {
     marginBottom: theme.spacing.xl,

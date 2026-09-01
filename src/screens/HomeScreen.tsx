@@ -14,8 +14,11 @@ export default function HomeScreen({ onPlay }: Props) {
       
       <View style={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.subtitle}>¿Dónde está este municipio?</Text>
+          <Text style={styles.subtitle}>¿DÓNDE ESTÁ?</Text>
           <Text style={styles.title}>ARAGÓN</Text>
+          <Text style={styles.description}>
+            Pon a prueba cuánto conoces el territorio aragonés.
+          </Text>
         </View>
 
         <View style={styles.heroGraphic}>
@@ -23,13 +26,13 @@ export default function HomeScreen({ onPlay }: Props) {
           <View style={styles.graphicAccent} />
         </View>
         
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.playButton} onPress={onPlay} activeOpacity={0.8}>
+        <View style={styles.footer}>
+          <View style={styles.infoContainer}>
+            <Text style={styles.infoText}>10 PUEBLOS · 50.000 PUNTOS</Text>
+          </View>
+
+          <TouchableOpacity style={styles.playButton} onPress={onPlay} activeOpacity={0.85}>
             <Text style={styles.playButtonText}>JUGAR</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.statsButton} activeOpacity={1}>
-            <Text style={styles.statsButtonText}>ESTADÍSTICAS</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -44,23 +47,32 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: theme.spacing.xl,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.xxl * 1.5,
+    paddingBottom: theme.spacing.xl,
     justifyContent: 'space-between',
   },
   header: {
-    marginTop: theme.spacing.xl,
     alignItems: 'center',
+  },
+  subtitle: {
+    ...theme.typography.subtitle,
+    color: theme.colors.textSecondary,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
   title: {
     ...theme.typography.display,
     color: theme.colors.primary,
-    letterSpacing: 2,
-    marginTop: theme.spacing.s,
+    letterSpacing: 4,
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.m,
   },
-  subtitle: {
-    ...theme.typography.h2,
-    color: theme.colors.textMain,
+  description: {
+    ...theme.typography.body,
     textAlign: 'center',
+    color: theme.colors.textSecondary,
+    paddingHorizontal: theme.spacing.m,
   },
   heroGraphic: {
     flex: 1,
@@ -68,49 +80,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   graphicCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     backgroundColor: theme.colors.secondary,
-    opacity: 0.1,
+    opacity: 0.08,
     position: 'absolute',
   },
   graphicAccent: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: theme.colors.primary,
-    opacity: 0.8,
-    transform: [{ translateX: 40 }, { translateY: -40 }],
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.colors.accent,
+    opacity: 0.9,
+    transform: [{ translateX: 60 }, { translateY: -60 }],
   },
-  actions: {
-    gap: theme.spacing.m,
-    marginBottom: theme.spacing.xl,
+  footer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  infoContainer: {
+    marginBottom: theme.spacing.l,
+    paddingVertical: theme.spacing.s,
+    paddingHorizontal: theme.spacing.m,
+    backgroundColor: theme.colors.surfaceMuted,
+    borderRadius: theme.radius.l,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  infoText: {
+    ...theme.typography.caption,
+    color: theme.colors.textSecondary,
+    letterSpacing: 1,
+    fontWeight: '700',
   },
   playButton: {
     backgroundColor: theme.colors.primary,
     paddingVertical: theme.spacing.m,
+    paddingHorizontal: theme.spacing.xl,
     borderRadius: theme.radius.m,
     alignItems: 'center',
+    width: '100%',
     ...theme.shadows.button,
   },
   playButtonText: {
     ...theme.typography.button,
     fontSize: 16,
-    letterSpacing: 1,
-  },
-  statsButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: theme.spacing.m,
-    borderRadius: theme.radius.m,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    opacity: 0.5,
-  },
-  statsButtonText: {
-    ...theme.typography.button,
-    color: theme.colors.textSecondary,
-    letterSpacing: 1,
+    letterSpacing: 2,
   },
 });
